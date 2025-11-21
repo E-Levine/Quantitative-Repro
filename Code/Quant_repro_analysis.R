@@ -3,6 +3,7 @@
 ## Packages
 if (!require("pacman")) {install.packages("pacman")}
 pacman::p_load(plyr, tidyverse, MASS,
+               readxl,
                broom, FSA, rcompanion, rstatix, 
                ggpubr, scales, wesanderson, fansi,
                install = TRUE) 
@@ -12,12 +13,50 @@ pacman::p_load(plyr, tidyverse, MASS,
 ## Water quality
 WQ_raw <- read.csv("Data/WQ.csv", header = T, na.strings = "Z")
 glimpse(WQ_raw)
-WQ_raw <- WQ_raw %>% mutate(
+WQ <- WQ_raw %>% mutate(
   #Convert Month, Site, Station to factors
   Month = factor(Month, levels = month.abb),
   Site = factor(Site, levels = c("AB", "CR", "LW", "LX", "SL", "TB")),
-  Station = as.factor(Station)
-)
+  Station = as.factor(Station))
+#
+#
+## Dermo
+Dermo_raw <- read.csv("Data/Dermo.csv", header = T, na.strings = "Z")
+glimpse(Dermo_raw)
+Dermo <- Dermo_raw %>% mutate(
+  #Convert Month, Site, Station to factors
+  Month = factor(Month, levels = month.abb),
+  Site = factor(Site, levels = c("AB", "CR", "LW", "LX", "SL", "TB")),
+  Season = as.factor(Season)) %>%
+  rename_with(~ gsub("\\.", "_", .x))
+#
+#
+## Repro
+Repro_raw <- read.csv("Data/Repro.csv", header = T, na.strings = "Z")
+glimpse(Repro_raw)
+Repro <- Repro_raw %>% mutate(
+  #Convert Month, Site, Station to factors
+  Month = factor(Month, levels = month.abb),
+  Site = factor(Site, levels = c("AB", "CR", "LW", "LX", "SL", "TB")),
+  Season = as.factor(Season),
+  Sex = as.factor(Sex),
+  Stage = as.factor(Stage))
+#
+#
+## CI
+CI_raw <- read.csv("Data/Condition.csv", header = T, na.strings = "Z")
+glimpse(CI_raw)
+Condition <- CI_raw %>% mutate(
+  #Convert Month, Site, Station to factors
+  Month = factor(Month, levels = month.abb),
+  Site = factor(Site, levels = c("AB", "CR", "LW", "LX", "SL", "TB")),
+  Season = as.factor(Season)) %>%
+  rename_with(~ gsub("\\.", "_", .x)) %>% # Replace . with _
+  rename_with(~ gsub("*__g_", "", .x)) # Remove units (__g_)
+#
+#
+
+#
 #
 #
 ## Formatting ####
@@ -62,8 +101,8 @@ pairwise.wilcox.test(WQ_raw$Temp, WQ_raw$Site, p.adjust.method = "bonferroni")
 #
 # MEANS
 # By Site
-WQ_raw %>% dplyr::select(Site, Temp) %>%
-  group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se"))
+(Temp_site <- WQ_raw %>% dplyr::select(Site, Temp) %>%
+  group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
 # By Site and Month
 Temp_monthly_means <- WQ_raw %>% dplyr::select(Site, Month, Temp) %>%
   group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
@@ -71,7 +110,9 @@ Temp_monthly_means <- WQ_raw %>% dplyr::select(Site, Month, Temp) %>%
 #
 # Letters
 TT <- (dunnTest(Temp ~ Site, data = WQ_raw, method = "bh"))$res
-(TT_letters <- cldList(comparison = TT$Comparison, p.value = TT$P.adj, threshold = 0.05))
+(TT_letters <- left_join(Temp_site,
+                         cldList(comparison = TT$Comparison, p.value = TT$P.adj, threshold = 0.05) %>%
+                           dplyr::select(Group, Letter) %>% rename("Site" = Group)))
 #
 ## Plotting 
 # By site
@@ -114,8 +155,8 @@ pairwise.wilcox.test(WQ_raw$Salinity, WQ_raw$Site, p.adjust.method = "bonferroni
 #
 # MEANS
 # By Site
-WQ_raw %>% dplyr::select(Site, Salinity) %>%
-  group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se"))
+(Sal_sites <- WQ_raw %>% dplyr::select(Site, Salinity) %>%
+  group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
 # By Site and Month
 Sal_monthly_means <- WQ_raw %>% dplyr::select(Site, Month, Salinity) %>%
   group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
@@ -123,7 +164,9 @@ Sal_monthly_means <- WQ_raw %>% dplyr::select(Site, Month, Salinity) %>%
 #
 # Letters
 ST <- (dunnTest(Salinity ~ Site, data = WQ_raw, method = "bh"))$res
-(ST_letters <- cldList(comparison = ST$Comparison, p.value = ST$P.adj, threshold = 0.05))
+(ST_letters <- left_join(Sal_sites,
+                         cldList(comparison = ST$Comparison, p.value = ST$P.adj, threshold = 0.05) %>%
+                           dplyr::select(Group, Letter) %>% rename("Site" = Group)))
 #
 ## Plotting 
 # By site
@@ -150,7 +193,6 @@ salinity %>%
 #
 #ggsave(path = "Output/", filename = "Fig3_Monthly_Sal_by_Site.tiff",dpi=1000)
 # 
-##Legend
 #
 ## Dermo ####
 
@@ -164,3 +206,25 @@ salinity %>%
 
 #
 #
+## Adding in 2011 SLC data ####
+#
+## WQ
+
+#
+#
+## Dermo
+
+#
+#
+## Repro
+SLC_repro_raw <- read_xlsx("Data/SLC_2011_AllData.xlsx", sheet = 1, .name_repair = "universal") 
+glimpse(SLC_repro_raw)
+SLC_repro <- SLC_repro_raw %>% mutate(
+  #Convert Month, Site, Station to factors
+  Month = factor(format(as.Date(SLC_raw$Date), "%b"), levels = month.abb),
+  Site = factor("SL", levels = c("AB", "CR", "LW", "LX", "SL", "TB"))) %>%
+  rename_with(~ gsub("\\.", "_", .x)) %>% # Replace . with _
+  rename_with(~ gsub("*__g_", "", .x)) # Remove units (__g_)
+#
+#
+## Condition Index
