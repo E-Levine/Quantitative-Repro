@@ -66,6 +66,8 @@ colors <- c("dodgerblue4", "chocolate", "mediumpurple2", "violetred",
             "forestgreen", "goldenrod1")
 names(colors) <- c("AB", "CR", "LW", "LX", "SL", "TB")
 colors
+Sites <- c("AB" = "Apalachicola Bay", "CR = Caloosahatchee", "LW" = "Lake Worth", "LX" = "Loxahatchee", 
+           "SL" = "St. Lucie", "TB" = "Tampa Bay")
 #
 # Base plot formatting
 Base <- theme_bw() +
@@ -81,42 +83,46 @@ Base <- theme_bw() +
 legend_config <- theme(legend.position = "top", 
                        legend.text = element_text(size = 12, color = "black", family = "serif"),
                        legend.title = element_text(size = 13, color = "black", family = "serif")) 
+# Base facet formatting
+FacetBase <- theme(panel.spacing = unit(-0.1, "cm"), strip.placement = "outside", 
+                   strip.text.x.top = element_text(size = 13, family = "serif", face = "bold"), 
+                   strip.clip = "off", panel.spacing.y = unit(0.5, "lines"))
 #
 #
 ## WQ ####
-summary(WQ_raw); head(WQ_raw)
+summary(WQ); head(WQ)
 #
 # Temperature
-temperature <- aggregate(Temp ~ Month + Site, WQ_raw, mean) #data
+temperature <- aggregate(Temp ~ Month + Site, WQ, mean) #data
 # TEST NORMALITY
-shapiro.test(WQ_raw$Temp) # not normal
+shapiro.test(WQ$Temp) # not normal
 #
 # TEST HOMOGENEITY OF VARIANCE
-bartlett.test(Temp~Month, data=WQ_raw) # at least one sample has a sig diff variance
+bartlett.test(Temp~Month, data=WQ) # at least one sample has a sig diff variance
 #
 # STATS
-(temp_kt <- kruskal.test(WQ_raw$Temp ~ WQ_raw$Site)) #less than 0.05 therefore there are significant differences between sites
+(temp_kt <- kruskal.test(WQ$Temp ~ WQ$Site)) #less than 0.05 therefore there are significant differences between sites
 temp_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
-pairwise.wilcox.test(WQ_raw$Temp, WQ_raw$Site, p.adjust.method = "bonferroni") 
+pairwise.wilcox.test(WQ$Temp, WQ$Site, p.adjust.method = "bonferroni") 
 #
 # MEANS
 # By Site
-(Temp_site <- WQ_raw %>% dplyr::select(Site, Temp) %>%
+(Temp_site <- WQ %>% dplyr::select(Site, Temp) %>%
   group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
 # By Site and Month
-Temp_monthly_means <- WQ_raw %>% dplyr::select(Site, Month, Temp) %>%
+Temp_monthly_means <- WQ %>% dplyr::select(Site, Month, Temp) %>%
   group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
   dplyr::select(-variable)
 #
 # Letters
-TT <- (dunnTest(Temp ~ Site, data = WQ_raw, method = "bh"))$res
+TT <- (dunnTest(Temp ~ Site, data = WQ, method = "bh"))$res
 (TT_letters <- left_join(Temp_site,
                          cldList(comparison = TT$Comparison, p.value = TT$P.adj, threshold = 0.05) %>%
                            dplyr::select(Group, Letter) %>% rename("Site" = Group)))
 #
 ## Plotting 
 # By site
-ggplot(WQ_raw, aes(x = Site, y = Temp)) +
+ggplot(WQ, aes(x = Site, y = Temp)) +
   geom_boxplot() +
   labs(y= expression("Average temperature ( " * degree* "C)"), x = "Site") +
   scale_y_continuous(expand = c(0,0), limits=c(0,40), breaks = seq(0,40, by = 10)) +
@@ -141,36 +147,36 @@ temperature %>%
 #
 #
 # Salinity
-salinity <- aggregate(Salinity ~ Month + Site, WQ_raw, mean)
+salinity <- aggregate(Salinity ~ Month + Site, WQ, mean)
 # TEST NORMALITY
-shapiro.test(WQ_raw$Salinity) # not normal
+shapiro.test(WQ$Salinity) # not normal
 #
 # TEST HOMOGENEITY OF VARIANCE
-bartlett.test(Salinity~Month, data=WQ_raw)# at least one sample has a sig diff variance
+bartlett.test(Salinity~Month, data=WQ)# at least one sample has a sig diff variance
 #
 # STATS
-(sal_kt <- kruskal.test(WQ_raw$Salinity ~ WQ_raw$Site)) #less than 0.05 therefore there are significant differences between sites
+(sal_kt <- kruskal.test(WQ$Salinity ~ WQ$Site)) #less than 0.05 therefore there are significant differences between sites
 sal_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
-pairwise.wilcox.test(WQ_raw$Salinity, WQ_raw$Site, p.adjust.method = "bonferroni") 
+pairwise.wilcox.test(WQ$Salinity, WQ$Site, p.adjust.method = "bonferroni") 
 #
 # MEANS
 # By Site
-(Sal_sites <- WQ_raw %>% dplyr::select(Site, Salinity) %>%
+(Sal_sites <- WQ %>% dplyr::select(Site, Salinity) %>%
   group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
 # By Site and Month
-Sal_monthly_means <- WQ_raw %>% dplyr::select(Site, Month, Salinity) %>%
+Sal_monthly_means <- WQ %>% dplyr::select(Site, Month, Salinity) %>%
   group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
   dplyr::select(-variable)
 #
 # Letters
-ST <- (dunnTest(Salinity ~ Site, data = WQ_raw, method = "bh"))$res
+ST <- (dunnTest(Salinity ~ Site, data = WQ, method = "bh"))$res
 (ST_letters <- left_join(Sal_sites,
                          cldList(comparison = ST$Comparison, p.value = ST$P.adj, threshold = 0.05) %>%
                            dplyr::select(Group, Letter) %>% rename("Site" = Group)))
 #
 ## Plotting 
 # By site
-ggplot(WQ_raw, aes(x = Site, y = Salinity)) +
+ggplot(WQ, aes(x = Site, y = Salinity)) +
   geom_boxplot() +
   labs(y= "Average salinity", x = "Site") +
   scale_y_continuous(expand = c(0,0), limits=c(0,45), breaks = seq(0,45, by = 10)) +
@@ -195,7 +201,100 @@ salinity %>%
 # 
 #
 ## Dermo ####
-
+summary(Dermo); head(Dermo)
+# Prevalence
+presencemean <- aggregate(PresenceBoth ~ Month + Site, Dermo, mean)
+# STATS
+(prevalence_kt <- kruskal.test(Dermo$PresenceBoth ~ Dermo$Site)) #less than 0.05 therefore there are significant differences between sites
+prevalence_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
+pairwise.wilcox.test(Dermo$PresenceBoth, Dermo$Site, p.adjust.method = "bonferroni") 
+#
+# MEANS
+# By Site
+(Prev_site <- Dermo %>% dplyr::select(Site, PresenceBoth) %>%
+  group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
+# Letters
+PrevT <- (dunnTest(PresenceBoth ~ Site, data = Dermo, method = "bh"))$res
+(PrevT_letters <- left_join(Prev_site,
+                         cldList(comparison = PrevT$Comparison, p.value = PrevT$P.adj, threshold = 0.05) %>%
+                           dplyr::select(Group, Letter) %>% rename("Site" = Group)))
+#
+ggplot(presencemean, aes(x = Site, y = PresenceBoth)) +
+  geom_boxplot(fill = "#999999") +
+  labs(y= "Dermo Prevalence", x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,1.3), breaks = seq(0,1.3, by = 0.5)) +
+  annotate("text", x=1:6, y=1.2, label=PrevT_letters$Letter, family = "serif", size = 6) +
+  Base
+#  
+#ggsave(path = "Output/", filename = "Fig4_Dermo_prevalence_by_Site.tiff",dpi=1000)
+#
+#
+# By Month and Site
+Prev_monthly_means <- Dermo %>% dplyr::select(Site, Month, PresenceBoth) %>%
+  group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
+  dplyr::select(-variable) %>%
+  complete(Site, Month, fill = list(mean = NA, sd = NA, se = NA, n = NA))
+#
+presencemean %>% 
+  ggplot(aes(Month, PresenceBoth, fill = Site))+
+  geom_bar(aes(x=Month, y=PresenceBoth), stat="identity")+
+  scale_x_discrete(limits = month.abb) + 
+  scale_y_continuous(expand = c(0,0),limits=c(0,1), breaks = seq(0,1, by = .25)) +
+    labs(y= "Prevalence of Dermo", 
+         x = "Month")  +
+  lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
+  scale_fill_manual(values = colors, labels = Sites)+
+  Base + theme(legend.position = "none")+
+  FacetBase + theme(axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1, margin = margin(t = 5)))
+#
+#ggsave(path = "Output/", filename = "Fig5_Dermo_prevalence_Monthly_Site.tiff",dpi=1000)
+#
+# Intensity
+intenseemean <- aggregate(Intensity ~ Month + Site, Dermo, mean) 
+# STATS
+(intensity_kt <- kruskal.test(Dermo$Intensity ~ Dermo$Site)) #less than 0.05 therefore there are significant differences between sites
+intensity_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
+pairwise.wilcox.test(Dermo$Intensity, Dermo$Site, p.adjust.method = "bonferroni") 
+#
+# MEANS
+# By Site
+(Inte_site <- Dermo %>% dplyr::select(Site, Intensity) %>%
+    group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
+# Letters
+InteT <- (dunnTest(Intensity ~ Site, data = Dermo, method = "bh"))$res
+(InteT_letters <- left_join(Inte_site,
+                            cldList(comparison = InteT$Comparison, p.value = InteT$P.adj, threshold = 0.05) %>%
+                              dplyr::select(Group, Letter) %>% rename("Site" = Group)))
+#
+ggplot(intenseemean, aes(x = Site, y = Intensity)) +
+  geom_boxplot(fill = "#999999") +
+  labs(y= "Dermo Intensity", x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,3), breaks = seq(0,3, by = 1)) +
+  annotate("text", x=1:6, y=2.70, label=PrevT_letters$Letter, family = "serif", size = 6) +
+  Base
+#  
+#ggsave(path = "Output/", filename = "Fig6_Dermo_intensity_by_Site.tiff",dpi=1000)
+#
+#
+# By Month and Site
+Inte_monthly_means <- Dermo %>% dplyr::select(Site, Month, Intensity) %>%
+  group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
+  dplyr::select(-variable) %>%
+  complete(Site, Month, fill = list(mean = NA, sd = NA, se = NA, n = NA))
+#
+intenseemean %>% 
+  ggplot(aes(Month, Intensity, fill = Site))+
+  geom_bar(aes(x=Month, y=Intensity), stat="identity")+
+  scale_x_discrete(limits = month.abb) + 
+  scale_y_continuous(expand = c(0,0),limits=c(0,5), breaks = seq(0,5, by = 1)) +
+  labs(y= "Average Intensity of Infection", 
+       x = "Month")  +
+  lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
+  scale_fill_manual(values = colors, labels = Sites)+
+  Base + theme(legend.position = "none")+
+  FacetBase + theme(axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1, margin = margin(t = 5)))
+#
+#ggsave(path = "Output/", filename = "Fig7_Dermo_intensity_Monthly_Site.tiff",dpi=1000)
 #
 #
 ## Repro ####
