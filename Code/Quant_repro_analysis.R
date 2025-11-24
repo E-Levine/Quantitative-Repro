@@ -1,4 +1,5 @@
-## Code for quantitative repro analysis
+## Code for quantitative repro analysis - original data
+# Does not include data from St Lucie 2011 samples
 
 ## Packages
 if (!require("pacman")) {install.packages("pacman")}
@@ -534,8 +535,124 @@ ggplot(aes(x=Stage, y=mean, fill=Site)) +
 #
 ## Condition Index ####
 #
-
+## Shell height
+# STATS
+(CISH_kt <- kruskal.test(Condition$SH_mm ~ Condition$Site)) 
+CISH_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
+pairwise.wilcox.test(Condition$SH_mm, Condition$Site, p.adjust.method = "bonferroni") 
 #
+# MEANS
+# By Site
+(CISH_site <- Condition %>% dplyr::select(Site, SH_mm) %>%
+    group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
+# By Site and Month
+CICH_monthly_means <- Condition %>% dplyr::select(Site, Month, SH_mm) %>%
+  group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
+  dplyr::select(-variable)
+#
+# Letters
+CISHT <- (dunnTest(SH_mm ~ Site, data = Condition, method = "bh"))$res
+(CISH_letters <- left_join(CISH_site,
+                         cldList(comparison = CISHT$Comparison, p.value = CISHT$P.adj, threshold = 0.05) %>%
+                           dplyr::select(Group, Letter) %>% rename("Site" = Group)))
+#
+## Plotting 
+# By site
+ggplot(Condition, aes(x = Site, y = SH_mm)) +
+  geom_boxplot(fill = "#999999") +
+  labs(y= "Average shell height (mm)", x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,130), breaks = seq(0,120, by = 20)) +
+  annotate("text", x=1:6, y=125, label=CISH_letters$Letter, family = "serif", size = 6) +
+  Base
+#
+#ggsave(path = "Output/", filename = "Fig17_CI_ShellHeight_Site.tiff",dpi=1000)
+#
+#NPM manuscript used mean of monthly means:
+CICH_monthly_means %>% 
+  ggplot(aes(x = Site, y = mean)) +
+  geom_boxplot() +
+  labs(y= "Average shell height (mm)", x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,105), breaks = seq(0,100, by = 20)) +
+  annotate("text", x=1:6, y=100, label=CISH_letters$Letter, family = "serif", size = 6) +
+  Base
+# Monthly
+CICH_monthly_means %>% 
+  ggplot(aes(Month, mean, color = Site, group = Site))+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), 
+                width = .25, size = 0.75) +
+  geom_line(size = 0.75) +
+  geom_point(size = 2.5) +
+  scale_x_discrete(limits = month.abb) +
+  scale_y_continuous(expand = c(0,0), limits=c(0,100), breaks = seq(0,100, by = 20)) +
+  labs(y= "Average Shell Height (mm)", 
+       x = "Month") +
+  Base + 
+  scale_colour_manual(values = colors)+ 
+  legend_config+
+  guides(color = guide_legend(nrow = 1))
+#
+#ggsave(path = "Output/", filename = "Fig18_Condition_ShellHeight_Month_Site.tiff",dpi=1000)
+#
+#
+#
+#
+# ## Condition Index
+# STATS
+(CI_kt <- kruskal.test(Condition$Condition_Index ~ Condition$Site)) 
+CI_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
+pairwise.wilcox.test(Condition$Condition_Index, Condition$Site, p.adjust.method = "bonferroni") 
+#
+# MEANS
+# By Site
+(CI_site <- Condition %>% dplyr::select(Site, Condition_Index) %>%
+    group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
+# By Site and Month
+CI_monthly_means <- Condition %>% dplyr::select(Site, Month, Condition_Index) %>%
+  group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
+  dplyr::select(-variable)
+#
+# Letters
+CIT <- (dunnTest(Condition_Index ~ Site, data = Condition, method = "bh"))$res
+(CI_letters <- left_join(CI_site,
+                           cldList(comparison = CIT$Comparison, p.value = CIT$P.adj, threshold = 0.05) %>%
+                             dplyr::select(Group, Letter) %>% rename("Site" = Group)))
+#
+## Plotting 
+# By site
+ggplot(Condition, aes(x = Site, y = Condition_Index)) +
+  geom_boxplot(fill = "#999999") +
+  labs(y= "Condition Index", x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,12), breaks = seq(0,12, by = 2)) +
+  annotate("text", x=1:6, y=11.5, label=CISH_letters$Letter, family = "serif", size = 6) +
+  Base
+#
+#ggsave(path = "Output/", filename = "Fig19_CI_Index_Site.tiff",dpi=1000)
+#
+#NPM manuscript used mean of monthly means:
+CI_monthly_means %>% 
+  ggplot(aes(x = Site, y = mean)) +
+  geom_boxplot() +
+  labs(y= "Condition Index", x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,7), breaks = seq(0,7, by = 2)) +
+  annotate("text", x=1:6, y=6.5, label=CISH_letters$Letter, family = "serif", size = 6) +
+  Base
+# Monthly
+CI_monthly_means %>% 
+  ggplot(aes(Month, mean, color = Site, group = Site))+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), 
+                width = .25, size = 0.75) +
+  geom_line(size = 0.75) +
+  geom_point(size = 2.5) +
+  scale_x_discrete(limits = month.abb) +
+  scale_y_continuous(expand = c(0,0), limits=c(0,7), breaks = seq(0,7, by = 2)) +
+  labs(y= "Average condition index", 
+       x = "Month") +
+  Base + 
+  scale_colour_manual(values = colors)+ 
+  legend_config+
+  guides(color = guide_legend(nrow = 1))
+#
+#ggsave(path = "Output/", filename = "Fig20_Condition_Index_Month_Site.tiff",dpi=1000)
 #
 ## Adding in 2011 SLC data ####
 #
