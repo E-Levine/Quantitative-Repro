@@ -654,25 +654,3 @@ CI_monthly_means %>%
 #
 #ggsave(path = "Output/", filename = "Fig20_Condition_Index_Month_Site.tiff",dpi=1000)
 #
-## Adding in 2011 SLC data ####
-#
-## WQ
-
-#
-#
-## Dermo
-
-#
-#
-## Repro
-SLC_repro_raw <- read_xlsx("Data/SLC_2011_AllData.xlsx", sheet = 1, .name_repair = "universal") 
-glimpse(SLC_repro_raw)
-SLC_repro <- SLC_repro_raw %>% mutate(
-  #Convert Month, Site, Station to factors
-  Month = factor(format(as.Date(SLC_raw$Date), "%b"), levels = month.abb),
-  Site = factor("SL", levels = c("AB", "CR", "LW", "LX", "SL", "TB"))) %>%
-  rename_with(~ gsub("\\.", "_", .x)) %>% # Replace . with _
-  rename_with(~ gsub("*__g_", "", .x)) # Remove units (__g_)
-#
-#
-## Condition Index
