@@ -4,7 +4,7 @@
 if (!require("pacman")) {install.packages("pacman")}
 pacman::p_load(plyr, tidyverse, MASS,
                readxl,
-               broom, FSA, rcompanion, rstatix, 
+               broom, FSA, rcompanion, rstatix, car, 
                ggpubr, scales, wesanderson, fansi,
                install = TRUE) 
 #
@@ -32,7 +32,7 @@ Dermo <- Dermo_raw %>% mutate(
 #
 #
 ## Repro
-Repro_raw <- read.csv("Data/Repro.csv", header = T, na.strings = "Z")
+Repro_raw <- read.csv("Data/Repro.csv", header = T)
 glimpse(Repro_raw)
 Repro <- Repro_raw %>% mutate(
   #Convert Month, Site, Station to factors
@@ -40,8 +40,8 @@ Repro <- Repro_raw %>% mutate(
   Site = factor(Site, levels = c("AB", "CR", "LW", "LX", "SL", "TB")),
   Season = as.factor(Season),
   Sex = as.factor(Sex),
-  Stage = as.factor(Stage))
-#
+  Stage = as.factor(Stage),
+  OocyteDiam = as.numeric(OocyteDiam))
 #
 ## CI
 CI_raw <- read.csv("Data/Condition.csv", header = T, na.strings = "Z")
@@ -60,19 +60,17 @@ Condition <- CI_raw %>% mutate(
 #
 #
 ## Formatting ####
-#
 ## Color by site
 colors <- c("dodgerblue4", "chocolate", "mediumpurple2", "violetred", 
             "forestgreen", "goldenrod1")
 names(colors) <- c("AB", "CR", "LW", "LX", "SL", "TB")
 colors
-Sites <- c("AB" = "Apalachicola Bay", "CR = Caloosahatchee", "LW" = "Lake Worth", "LX" = "Loxahatchee", 
+Sites <- c("AB" = "Apalachicola Bay", "CR" = "Caloosahatchee", "LW" = "Lake Worth", "LX" = "Loxahatchee", 
            "SL" = "St. Lucie", "TB" = "Tampa Bay")
 #
 # Base plot formatting
 Base <- theme_bw() +
-  theme(panel.grid = element_blank(), panel.border = element_blank(), panel.background = element_blank(),
-        axis.line = element_line(color = "black"),
+  theme(panel.grid = element_blank(), panel.border = element_blank(), panel.background = element_blank(), axis.line = element_line(color = "black"),
         axis.title = element_text(size = 14, color = "black", family = "serif"),
         axis.text.x = element_text(size = 13, color = "black", 
                                    margin = unit(c(0.5, 0.5, 0, 0.5), "cm"), family = "serif"),
@@ -88,6 +86,8 @@ FacetBase <- theme(panel.spacing = unit(-0.1, "cm"), strip.placement = "outside"
                    strip.text.x.top = element_text(size = 13, family = "serif", face = "bold"), 
                    strip.clip = "off", panel.spacing.y = unit(0.5, "lines"))
 #
+FacetSpace <- theme(panel.spacing.y = unit(-0.05, "lines"), panel.spacing.x = unit(-0.50, "lines"), 
+                    axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1, margin = margin(t = 5)))
 #
 ## WQ ####
 summary(WQ); head(WQ)
@@ -245,7 +245,7 @@ presencemean %>%
   lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
   scale_fill_manual(values = colors, labels = Sites)+
   Base + theme(legend.position = "none")+
-  FacetBase + theme(axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1, margin = margin(t = 5)))
+  FacetBase + FacetSpace
 #
 #ggsave(path = "Output/", filename = "Fig5_Dermo_prevalence_Monthly_Site.tiff",dpi=1000)
 #
@@ -292,16 +292,248 @@ intenseemean %>%
   lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
   scale_fill_manual(values = colors, labels = Sites)+
   Base + theme(legend.position = "none")+
-  FacetBase + theme(axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1, margin = margin(t = 5)))
+  FacetBase + FacetSpace
 #
 #ggsave(path = "Output/", filename = "Fig7_Dermo_intensity_Monthly_Site.tiff",dpi=1000)
 #
 #
 ## Repro ####
+summary(Repro); head(Repro)
+#
+# Monthly proportion male v female all sites:
+Repro %>% dplyr::group_by(Month, Sex) %>% 
+  summarise(Count = n()) %>%
+  pivot_wider(names_from = "Sex", values_from = "Count") %>%
+  arrange(factor(Month, levels = month.abb)) %>%
+  ungroup() %>%
+  # Get total samples for proportions
+  mutate(Total = rowSums(dplyr::select(., F, M, Z, H), na.rm = TRUE)) %>%
+  # Get proportions
+  mutate(F_prop = round(F/Total,2),
+         M_prop = round(M/Total,2),
+         Z_prop = round(Z/Total,2),
+         H_prop = round(H/Total,2))
+#
+Repro %>%
+  ggplot()+
+  geom_bar(aes(x=Month, fill=Sex), position="fill", color = "darkgreen") +
+  labs(x = "Month",
+       y = "Proportion") +
+  lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
+  scale_x_discrete(limits = month.abb) +
+  scale_y_continuous(expand = c(0,0))+
+  scale_fill_brewer(palette="Greens")+
+  Base +
+  legend_config + 
+  FacetBase + FacetSpace
+#
+#ggsave(path = "Output/", filename = "Fig8_Repro_MF_Monthly_Site.tiff",dpi=1000)
+#
+#
+# Monthly proportion per stage all sites:
+Repro %>% dplyr::group_by(Month, Stage) %>% 
+  summarise(Count = n()) %>%
+  pivot_wider(names_from = "Stage", values_from = "Count") %>%
+  arrange(factor(Month, levels = month.abb)) %>%
+  ungroup() %>%
+  # Get total samples for proportions
+  mutate(Total = rowSums(dplyr::select(., `1`, `2`, `3`, `4`, `NA`), na.rm = TRUE)) %>%
+  # Get proportions
+  mutate(Prop_1 = round(`1`/Total,2),
+         Prop_2 = round(`2`/Total,2),
+         Prop_3 = round(`3`/Total,2),
+         Prop_4 = round(`4`/Total,2),
+         Prop_Z = round(`NA`/Total, 2))
+#
+Repro %>% 
+  ggplot()+
+  geom_bar(mapping=aes(x=Month, fill=Stage),position="fill", color = "darkblue") +
+  labs(x = "Month",
+       y = "Proportion") +
+  scale_x_discrete(limits = month.abb) +
+  scale_y_continuous(expand = c(0,0))+
+  lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
+  scale_fill_brewer(palette="Blues")+
+  Base + legend_config +
+  FacetBase +  FacetSpace
+#
+#ggsave(path = "Output/", filename = "Fig9_Repro_Stages_Monthly_Site.tiff",dpi=1000)
+#
+# Monthly proportion per stage by site:
+(Stages_by_site <- Repro %>% dplyr::group_by(Site, Month, Stage) %>% 
+  summarise(Count = n()) %>%
+  pivot_wider(names_from = "Stage", values_from = "Count") %>%
+  ungroup() %>%
+  # Get total samples for proportions
+  mutate(Total = rowSums(dplyr::select(., `1`, `2`, `3`, `4`, `NA`), na.rm = TRUE)) %>%
+  # Get proportions
+  mutate(Prop_1 = round(`1`/Total,2),
+         Prop_2 = round(`2`/Total,2),
+         Prop_3 = round(`3`/Total,2),
+         Prop_4 = round(`4`/Total,2),
+         Prop_Z = round(`NA`/Total, 2)))
+#
+#
+# Number of Oysters with parasites
+par <- with(Repro, table(Parasite, Site))
 
+ggplot(as.data.frame(par), aes(factor(Parasite), Freq, fill = Site)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  labs(y= "Number of Oysters with Parasites", x = "Parasites") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,140), breaks = seq(0,140, by = 20)) +
+  scale_fill_manual(values = colors) +
+  Base + 
+  legend_config + guides(fill = guide_legend(nrow = 1))
+#
+#ggsave(path = "Output/", filename = "Fig10_Repro_Parasites_Site.tiff",dpi=1000)
+#
+#
+#
+## Gonad Percent
+gonadmean <- aggregate(GonadPercent ~ Month + Site, Repro, mean)
+#Levene test for non-normal data
+leveneTest(Repro$GonadPercent, Repro$Site, center = mean) #variances assumed to not be equal
+# STATS
+(gonadPct_kt <- kruskal.test(Repro$GonadPercent ~ Repro$Site))
+gonadPct_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
+dunnTest(GonadPercent ~ Site, data = Repro, method = "bonferroni")
+#
+# MEANS
+# By Site
+(GPct_site <- Repro %>% dplyr::select(Site, GonadPercent) %>%
+    group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se")))
+# Letters
+GPctT <- (dunnTest(GonadPercent ~ Site, data = Repro, method = "bh"))$res
+(GPctT_letters <- left_join(GPct_site,
+                            cldList(comparison = GPctT$Comparison, p.value = GPctT$P.adj, threshold = 0.05) %>%
+                              dplyr::select(Group, Letter) %>% rename("Site" = Group)))
+#
+ggplot(gonadmean, aes(x = Site, y = GonadPercent)) +
+  geom_boxplot(fill = "#999999") +
+  labs(y= "Gonad Percent Area", x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,62), breaks = seq(0,60, by = 20)) +
+  annotate("text", x=1:6, y=60, label=GPctT_letters$Letter, family = "serif", size = 6) +
+  Base
+#  
+#ggsave(path = "Output/", filename = "Fig11_Repro_Gonad_Percent_by_Site.tiff",dpi=1000)
+#
+#
+# By Month and Site
+GPct_monthly_means <- Repro %>% dplyr::select(Site, Month, GonadPercent) %>%
+  group_by(Site, Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
+  dplyr::select(-variable) %>%
+  complete(Site, Month, fill = list(mean = NA, sd = NA, se = NA, n = NA))
+#
+GPct_monthly_means %>% 
+  ggplot(aes(x=Month, y=mean, colour=Site, group=Site))+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), 
+                width = .25, size = 0.75) +
+  geom_line(size = 0.75) +
+  geom_point(size = 2.5) +
+  scale_x_discrete(limits = month.abb) + 
+  scale_y_continuous(expand = c(0,0),limits=c(0,70), breaks = seq(0,70, by = 10)) +
+  labs(y= "Average Gonad Percent Area", 
+       x = "Month")  +
+  lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
+  scale_color_manual(values = colors, labels = Sites)+
+  Base + theme(legend.position = "none")+
+  FacetBase + FacetSpace
+#
+#ggsave(path = "Output/", filename = "Fig12_Repro_Gonad_Percent_Monthly_Site.tiff",dpi=1000)
+#
+#
+# Percent area by stage and site
+(gonadstage <- Repro %>% dplyr::select(Site, Stage, GonadPercent) %>%
+  group_by(Site, Stage) %>% get_summary_stats(show = c("mean", "sd", "se")) %>%
+  dplyr::select(-variable) %>%
+  complete(Site, Stage, fill = list(mean = NA, sd = NA, se = NA, n = NA)))
+#
+gonadstage %>%
+ggplot(aes(x=Stage, y=mean, fill=Site)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+                size=0.8,    # Thinner lines
+                width=.25,
+                position=position_dodge(.9)) +
+  labs(y= "Average Gonad Percent Area", x = "Stage") +
+  scale_y_continuous(expand= c(0,0), limits=c(0,70), breaks = seq(0,70, by = 10)) +
+  scale_fill_manual(values = colors) +
+  Base + 
+  legend_config + guides(fill = guide_legend(nrow = 1))
+#
+#ggsave(path = "Output/", filename = "Fig13_Repro_Gonad_Percent_Stage_Site.tiff",dpi=1000)
+#
+#
+## Oocyte by Site
+oocytemean <- aggregate(OocyteDiam ~ Month + Site, Repro, mean)
+#Levene test for non-normal data
+leveneTest(Repro$OocyteDiam, Repro$Site, center = mean) #variances assumed to not be equal
+# STATS
+(oocyte_kt <- kruskal.test(Repro$OocyteDiam ~ Repro$Site)) #no sig diff
+Repro %>% dplyr::select(Site, OocyteDiam) %>%
+  group_by(Site) %>% get_summary_stats(show = c("mean", "sd", "se"))
+#
+oocytemean %>% 
+  ggplot(aes(x = Site, y = OocyteDiam)) +
+  geom_boxplot(fill = "#999999") +
+  labs(y= expression("Oocyte Diameter ( " * mu * "m)"), 
+       x = "Site") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,40), breaks = seq(0,40, by = 10)) +
+  Base
+#
+#ggsave(path = "Output/", filename = "Fig14_Repro_Oocyte_Diameter_Site.tiff",dpi=1000)
+#
+Repro %>% dplyr::select(Site, Month, OocyteDiam) %>%
+  group_by(Site,Month) %>% get_summary_stats(show = c("mean", "sd", "se")) %>% 
+  ggplot(aes(x=Month, y=mean, colour=Site, group=Site)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), 
+                width = .25, size = 0.75) +
+  geom_line(size = 0.75) +
+  geom_point(size = 2.5) +
+  labs(y= expression("Average Oocyte Diameter ( " * mu * "m)"), 
+       x = "Month") +
+  scale_x_discrete(limits = month.abb) +
+  scale_y_continuous(expand = c(0,0), limits=c(0,50), breaks = seq(0,50, by = 10)) +
+  lemon::facet_rep_wrap(.~Site, labeller = labeller(Site = Sites))+
+  scale_colour_manual(values = colors, labels = Sites)+
+  Base + theme(legend.position = "none")+
+  FacetBase + FacetSpace
+#
+#ggsave(path = "Output/", filename = "Fig15_Repro_Oocyte_Diameter_Month_Site.tiff",dpi=1000)
+#
+#
+# Oocyte by stage
+OOstagemean <- aggregate(oocytemean ~ Site + Stage, Repro, mean)
+#Levene test for non-normal data
+leveneTest(Repro$OocyteDiam, Repro$Stage, center = mean) #variances assumed to not be equal
+# STATS
+(oostage_kt <- kruskal.test(Repro$OocyteDiam ~ Repro$Stage))
+oostage_kt %>% tidy() %>% as.data.frame() %>% dplyr::select(method, everything())
+dunnTest(OocyteDiam ~ Stage, data = Repro, method = "bonferroni")
+#
+OocyteStagedata<- Repro %>% dplyr::select(Site, Stage, OocyteDiam) %>%
+  group_by(Site, Stage) %>% get_summary_stats(show = c("mean", "sd", "se"))
+(dunnTest(OocyteDiam ~ Stage, data = Repro, method = "bh"))$res
+#
+OocyteStagedata %>%
+ggplot(aes(x=Stage, y=mean, fill=Site)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se),
+                size=.8,    # Thinner lines
+                width=.25,
+                position=position_dodge(.93)) +
+  labs(y= expression("Average Oocyte Diameter ( " * mu * "m)"), 
+       x = "Stage") +
+  scale_y_continuous(expand = c(0,0), limits=c(0,40), breaks = seq(0,40, by = 10)) +
+  scale_fill_manual(values = colors) +
+  Base + 
+  legend_config + guides(fill = guide_legend(nrow = 1))
+#
+#ggsave(path = "Output/", filename = "Fig16_Repro_Oocyte_Diameter_Stage_Site.tiff",dpi=1000)
 #
 #
 ## Condition Index ####
+#
 
 #
 #
